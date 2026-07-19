@@ -36,6 +36,8 @@ button{font-family:inherit;color:inherit;cursor:pointer}
   filter:blur(3px) saturate(.45) brightness(.55) contrast(.9);
   transform:scale(1.06);will-change:filter}
 #cam.mirror{transform:scale(1.06) scaleX(-1)}
+/* 省電力：全画面 blur はGPUの合成コストが高いので外し、減光だけで視認性を確保する */
+#cam.eco{filter:saturate(.42) brightness(.5) contrast(.92)}
 #gl{position:absolute;inset:0;width:100%;height:100%;display:block;z-index:2}
 
 /* --- HUD --- */
@@ -218,7 +220,9 @@ const S = {
   load(){ try{ return JSON.parse(localStorage.getItem("kb.cfg")||"{}"); }catch(e){ return {}; } },
   save(o){ try{ localStorage.setItem("kb.cfg", JSON.stringify(o)); }catch(e){} }
 };
-const cfg = Object.assign({sound:true, bgm:true, speed:"mid", dim:0.55, facing:"environment", level:1}, S.load());
+const cfg = Object.assign({sound:true, bgm:true, speed:"mid", dim:0.55, facing:"environment", level:1,
+  eco:true    // 省電力（発熱を抑える）：解像度・カメラ画質・エフェクトを落とす
+}, S.load());
 const saveCfg = () => S.save(cfg);
 
 /* ---------- 記録（上位5件） ---------- */
@@ -264,7 +268,7 @@ const CHORUS_MEL  = [
 
 const Sound = {
   ctx:null, master:null, bgmGain:null, sfxGain:null,
-  side:null, delay:null, noiseBuf:null, bgmReady:false,
+  side:null, delay:null, noiseBuf:null, sfxNoise:null, bgmReady:false,
   timer:null, step:0, nextT:0, tempo:128,
   init(){
     if(this.ctx) return;
@@ -274,6 +278,11 @@ const Sound = {
     this.master = this.ctx.createGain(); this.master.gain.value = cfg.sound?0.9:0; this.master.connect(this.ctx.destination);
     this.bgmGain = this.ctx.createGain(); this.bgmGain.gain.value = 0.30; this.bgmGain.connect(this.master);
     this.sfxGain = this.ctx.createGain(); this.sfxGain.gain.value = 0.6; this.sfxGain.connect(this.master);
+    // 効果音用のホワイトノイズは起動時に1本だけ作って使い回す（発音のたびの生成をやめる）
+    const n = Math.floor(this.ctx.sampleRate*0.5);
+    this.sfxNoise = this.ctx.createBuffer(1,n,this.ctx.sampleRate);
+    const nd = this.sfxNoise.getChannelData(0);
+    for(let i=0;i<n;i++) nd[i] = Math.random()*2-1;
   },
   resume(){ this.init(); if(this.ctx && this.ctx.state==="suspended") this.ctx.resume(); },
   setEnabled(on){ this.init(); if(this.master) this.master.gain.value = on?0.9:0; },
@@ -291,15 +300,21 @@ const Sound = {
     o.connect(g); g.connect(dest||this.sfxGain); o.start(t); o.stop(t+dur+0.02);
   },
   noise(dur, gain, freq, type, dest, at, q){
-    if(!this.ctx || !cfg.sound) return;
-    const t = at || this.ctx.currentTime, n = Math.max(1,Math.floor(this.ctx.sampleRate*dur));
-    const buf = this.ctx.createBuffer(1,n,this.ctx.sampleRate), d = buf.getChannelData(0);
-    for(let i=0;i<n;i++) d[i] = (Math.random()*2-1) * Math.pow(1-i/n, 2.2);
-    const src = this.ctx.createBufferSource(); src.buffer = buf;
+    if(!this.ctx || !cfg.sound || !this.sfxNoise) return;
+    const t = at || this.ctx.currentTime;
+    // 使い回しのノイズを適当な位置から鳴らし、減衰はゲインのエンベロープで作る
+    const src = this.ctx.createBufferSource(); src.buffer = this.sfxNoise;
+    src.loop = true;
     const f = this.ctx.createBiquadFilter(); f.type = type||"bandpass";
     f.frequency.value = freq||1800; f.Q.value = q||1;
-    const g = this.ctx.createGain(); g.gain.value = gain||0.2;
-    src.connect(f); f.connect(g); g.connect(dest||this.sfxGain); src.start(t);
+    const g = this.ctx.createGain();
+    const pk = gain||0.2;
+    g.gain.setValueAtTime(pk, t);
+    g.gain.exponentialRampToValueAtTime(pk*0.16, t+dur*0.5);   // 元の (1-t)^2.2 に近い減衰
+    g.gain.exponentialRampToValueAtTime(0.0001, t+dur);
+    src.connect(f); f.connect(g); g.connect(dest||this.sfxGain);
+    src.start(t, Math.random()*0.4);                            // 毎回ちがう位置から鳴らす
+    src.stop(t+dur+0.02);
   },
 
   /* ---------- 効果音 ---------- */
@@ -499,7 +514,7 @@ class MotionGPU {
     this.tex = [this.mkTex(), this.mkTex()];
     this.fbo = [this.mkFbo(this.tex[0]), this.mkFbo(this.tex[1])];
     this.dtex = this.mkTex(); this.dfbo = this.mkFbo(this.dtex);
-    this.cur = 0; this.warm = 0;
+    this.cur = 0; this.warm = 0; this.lastVT = -1;
     this.px = new Uint8Array(MW*MREGION*4);
     this.ok = true;
   }
@@ -525,6 +540,10 @@ class MotionGPU {
   read(){
     const gl = this.gl, v = this.video;
     if(!v || v.readyState < 2) return null;
+    /* カメラは30fps前後、描画は60fps。同じ映像フレームを2度処理しても差分は必ず0になるため、
+       GPU転送・シェーダ・readPixels をまるごと省く。検出結果は従来と完全に同一。 */
+    if(v.currentTime === this.lastVT) return 0;
+    this.lastVT = v.currentTime;
     gl.viewport(0,0,MW,MH);
     // 1) 映像を縮小してGPU上に取り込む
     gl.activeTexture(gl.TEXTURE0);
@@ -548,6 +567,7 @@ class MotionGPU {
     if(this.warm < 2){ this.warm++; return null; }
     return this.px;
   }
+  reset(){ this.warm = 0; this.lastVT = -1; }
   dispose(){}
 }
 
@@ -556,10 +576,12 @@ class Motion2D {          // WebGL2 が無い環境向けフォールバック
     this.video = video; this.ok = true;
     const c = document.createElement("canvas"); c.width=MW; c.height=MH;
     this.ctx = c.getContext("2d",{willReadFrequently:true});
-    this.prev = null; this.out = new Uint8Array(MW*MREGION*4);
+    this.prev = null; this.lastVT = -1; this.out = new Uint8Array(MW*MREGION*4);
   }
   read(){
     const v = this.video; if(!v || v.readyState<2) return null;
+    if(v.currentTime === this.lastVT) return 0;
+    this.lastVT = v.currentTime;
     this.ctx.drawImage(v,0,0,MW,MH);
     const d = this.ctx.getImageData(0,0,MW,MH).data;
     if(!this.prev){ this.prev = new Uint8ClampedArray(d); return null; }
@@ -575,11 +597,13 @@ class Motion2D {          // WebGL2 が無い環境向けフォールバック
     this.prev.set(d);
     return this.out;
   }
+  reset(){ this.prev = null; this.lastVT = -1; }
   dispose(){}
 }
 
 /* 差分バッファ → 操作入力 */
 function analyze(px, mirror, state){
+  if(px === 0){ state.intensity *= 0.88; return state; }   // 新しい映像フレーム待ち＝動きなしと同じ扱い
   if(!px) return state;
   let sum=0, count=0, energy=0;
   for(let i=0;i<px.length;i+=4){
@@ -602,7 +626,7 @@ function analyze(px, mirror, state){
 const V_STRIDE = 11; // x,y,u,v,r,g,b,a,ex,ey,mode
 class GLRenderer {
   constructor(canvas){
-    const gl = canvas.getContext("webgl2",{alpha:true, antialias:true, premultipliedAlpha:true, powerPreference:"high-performance"});
+    const gl = canvas.getContext("webgl2",{alpha:true, antialias:false, premultipliedAlpha:true, powerPreference:"default"});
     if(!gl){ this.ok=false; return; }
     this.gl = gl; this.canvas = canvas; this.ok = true;
     const vs = `#version 300 es
@@ -737,7 +761,7 @@ const G = {
 
 function resize(){
   G.W = window.innerWidth; G.H = window.innerHeight;
-  G.dpr = Math.min(window.devicePixelRatio||1, 2);
+  G.dpr = Math.min(window.devicePixelRatio||1, cfg.eco ? 1.4 : 2);   // 省電力時は描画画素数を約半分に
   G.paddle.y = G.H*0.86;
   G.paddle.w = G.W * LEVELS[G.level-1].paddle;
   G.ball.r = Math.max(11, Math.min(G.W,G.H)*0.022);
@@ -886,7 +910,7 @@ function update(dt){
     if(q.life<=0) G.particles.splice(i,1);
   }
   // 軌跡
-  G.trail.push({x:b.x,y:b.y}); if(G.trail.length>14) G.trail.shift();
+  G.trail.push({x:b.x,y:b.y}); if(G.trail.length > (cfg.eco?8:14)) G.trail.shift();
   G.flash = Math.max(0, G.flash - 0.06*dt);
 
   // クリア判定（破壊不能ブロックは対象外）
@@ -933,6 +957,12 @@ function draw(){
 /* --- ループ --- */
 let raf = 0;
 function frame(t){
+  // パネルが画面を覆っているあいだは検出も描画も不要（10fpsで待機するだけ）
+  if(!panel.classList.contains("hidden")){
+    if(t - (G.panelT||0) > 100){ G.panelT = t; }
+    G.lastT = t;
+    raf = requestAnimationFrame(frame); return;
+  }
   const dt = clamp((t-(G.lastT||t))/16.667, 0, 3); G.lastT = t;
   if(G.motion && G.camReady) analyze(G.motion.read(), cfg.facing==="user", G.input);
   update(dt);
@@ -959,11 +989,14 @@ setInterval(()=>{
 async function startCamera(facing){
   stopCamera();
   const get = (exact)=> navigator.mediaDevices.getUserMedia({
-    video:{ facingMode: exact?{exact:facing}:facing, width:{ideal:640}, height:{ideal:480}, frameRate:{ideal:30} }, audio:false });
+    video:{ facingMode: exact?{exact:facing}:facing,
+            width:{ideal: cfg.eco?320:640}, height:{ideal: cfg.eco?240:480},
+            frameRate:{ideal:30, max:30} }, audio:false });
   let stream;
   try{ stream = await get(true); }catch(e){ stream = await get(false); }
   G.stream = stream; cam.srcObject = stream;
   cam.classList.toggle("mirror", facing==="user");
+  cam.classList.toggle("eco", !!cfg.eco);
   await cam.play();
   const m = new MotionGPU(cam);
   G.motion = m.ok ? m : new Motion2D(cam);
@@ -987,8 +1020,15 @@ function toast(msg){
    5. 画面（メニュー／終了／設定）
    =========================================================== */
 const panel = $("#panel"), body = $("#panelBody");
-function hidePanel(){ panel.classList.add("hidden"); document.body.classList.remove("ui-hidden"); }
-function showPanel(html){ body.innerHTML = html; panel.classList.remove("hidden"); document.body.classList.add("ui-hidden"); panel.scrollTop = 0; }
+/* パネル（メニュー・中断・結果）を出しているあいだはカメラ映像を止める。
+   トラックを無効化するだけなので権限の再取得は起きず、復帰も一瞬。 */
+function setCamActive(on){
+  if(!G.stream) return;
+  G.stream.getVideoTracks().forEach(t => { t.enabled = on; });
+  if(on && G.motion && G.motion.reset) G.motion.reset();   // 再開時の1発目の差分を捨てる
+}
+function hidePanel(){ panel.classList.add("hidden"); document.body.classList.remove("ui-hidden"); setCamActive(true); }
+function showPanel(html){ body.innerHTML = html; panel.classList.remove("hidden"); document.body.classList.add("ui-hidden"); panel.scrollTop = 0; setCamActive(false); }
 
 function recordsTable(){
   const list = Records.all();
@@ -1033,6 +1073,8 @@ function menu(){
           ${SPEED_ORDER.map(k=>`<button class="seg" data-s="${k}" data-sel="${cfg.speed===k?1:0}">${SPEEDS[k].n}<small>×${speedRel(k).toFixed(2)}</small></button>`).join("")}
         </div>
       </div>
+      <div class="row"><span>省電力（発熱を抑える）<small style="display:block;font:500 10px/1.4 var(--ui);color:var(--slate)">描画画素数・カメラ画質・エフェクトを下げます。検出の精度は変わりません</small></span>
+        <button class="sw" id="swEco" data-on="${cfg.eco?1:0}"></button></div>
       <div class="row"><span>画面を暗くする</span><input type="range" id="dim" min="0" max="0.85" step="0.05" value="${cfg.dim}"></div>
       <div class="row"><span>カメラ</span><button class="ghost" style="width:auto;padding:9px 16px;margin:0" id="face">${cfg.facing==="user"?"インカメラ":"アウトカメラ"}</button></div>
       <div class="row" id="rowInstall" style="display:none"><span>ホーム画面に追加</span>
@@ -1066,6 +1108,11 @@ function menu(){
     setName();
     Sound.resume(); Sound.blip(700,0.06,"triangle",0.2);
   });
+  $("#swEco").onclick = e=>{
+    cfg.eco = !cfg.eco; e.currentTarget.dataset.on = cfg.eco?1:0; saveCfg();
+    cam.classList.toggle("eco", !!cfg.eco); resize();
+    toast(cfg.eco ? "省電力：オン（カメラ画質は次回開始から）" : "省電力：オフ");
+  };
   $("#dim").oninput = e=>{ cfg.dim=+e.target.value; saveCfg(); };
   $("#face").onclick = async e=>{
     cfg.facing = cfg.facing==="user"?"environment":"user"; saveCfg();
