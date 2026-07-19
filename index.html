@@ -54,7 +54,8 @@ button{font-family:inherit;color:inherit;cursor:pointer}
   background:linear-gradient(90deg,var(--teal),var(--amber));transition:width .12s linear}
 
 #hint{position:absolute;left:0;right:0;bottom:calc(env(safe-area-inset-bottom) + 126px);text-align:center;
-  z-index:5;pointer-events:none;font:700 11px/1 var(--ui);letter-spacing:.3em;color:rgba(255,255,255,.42)}
+  z-index:5;pointer-events:none;font:700 11px/1.5 var(--ui);letter-spacing:.08em;color:rgba(255,255,255,.48);
+  padding:0 14px}
 
 #tools{position:absolute;right:12px;bottom:calc(env(safe-area-inset-bottom) + 12px);z-index:6;
   display:flex;gap:8px}
@@ -145,20 +146,20 @@ input[type=range]::-moz-range-thumb{width:20px;height:20px;border:none;border-ra
   <canvas id="gl"></canvas>
 
   <div class="hud" id="topbar">
-    <div class="stat" id="vTime"><b>じかん</b><span>0:00</span></div>
+    <div class="stat" id="vTime"><b>時間</b><span>0:00</span></div>
     <div class="stat" id="vScore"><b>ポイント</b><span>0</span></div>
     <div class="stat" id="vLevel"><b>レベル</b><span>1</span></div>
-    <div class="stat" id="vLives"><b>のこり</b><span>5</span></div>
+    <div class="stat" id="vLives"><b>残り</b><span>5</span></div>
   </div>
 
   <div id="effort"><div id="effortFill"></div></div>
-  <div id="hint">ひざを上げて左右に動かす</div>
+  <div id="hint">左足を上げる→左へ移動／右足を上げる→右へ移動</div>
 
   <div id="spBadge"><i>ボールの速さ</i><b id="spBadgeVal">N</b><em id="spBadgeMul">×1.00</em></div>
 
   <div id="tools">
     <button class="tool" id="btnSound" title="音">🔊</button>
-    <button class="tool" id="btnSpeed" title="ボールの速さ"><b id="spLbl">N</b><i>はやさ</i></button>
+    <button class="tool" id="btnSpeed" title="ボールの速さ"><b id="spLbl">N</b><i>速さ</i></button>
     <button class="tool" id="btnCam" title="カメラ切替">🔄</button>
     <button class="tool" id="btnPause" title="中断">⏸</button>
   </div>
@@ -1002,7 +1003,7 @@ function menu(){
   showPanel(`
     <p class="eyebrow">EXERCISE THERAPY</p>
     <h1>ブロック崩し<em>de</em>足トレ</h1>
-    <p class="lede">カメラの前に立ち、ひざを高く上げながら左右に体重を移します。動いた位置にバーが追従します。座ったままでも、足踏みで操作できます。</p>
+    <p class="lede">仰臥位のまま、足もと側にスマートフォンを固定して使用します。<b style="color:var(--text)">左足を上げると左へ、右足を上げると右へ</b>バーが移動します。膝を高く上げるほど確実に検出されます。座位で足踏みをする形でも操作できます。</p>
 
     <div class="card">
       <h2>レベル（全10段階）</h2>
@@ -1012,7 +1013,7 @@ function menu(){
       <p class="lvname" id="lvname"></p>
     </div>
 
-    <button class="cta" id="go">はじめる</button>
+    <button class="cta" id="go">開始する</button>
     <button class="ghost" id="goNoCam">カメラを使わずに試す（矢印キー／指で操作）</button>
 
     <div class="card" style="margin-top:14px">
@@ -1093,10 +1094,10 @@ function endGame(cleared, noAuto){
 
   showPanel(`
     <p class="eyebrow">${cleared?"STAGE CLEAR":"MISS"}</p>
-    <h1>${cleared?`Lv${G.level} <em>クリア</em>`:"もういちど <em>いこう</em>"}</h1>
+    <h1>${cleared?`Lv${G.level} <em>クリア</em>`:"もう一度 <em>挑戦</em>"}</h1>
     <div class="card big">
       <div class="n">${fmtTime(sec)}</div>
-      <div class="u">うんどう時間</div>
+      <div class="u">運動時間</div>
       ${rank?`<span class="newrec">記録更新　第${rank}位</span>`:""}
     </div>
     <div class="grid2">
@@ -1105,19 +1106,19 @@ function endGame(cleared, noAuto){
     </div>
     ${auto ? `
       <div class="card" id="cdCard">
-        <h2>${toNext?"つぎのステージへ":"おなじレベルで再開"}</h2>
+        <h2>${toNext?"次のステージへ":"同じレベルで再開"}</h2>
         <div style="display:flex;align-items:center;gap:16px">
           <div class="ring"><svg viewBox="0 0 44 44"><circle class="bg" cx="22" cy="22" r="19"/><circle class="fg" id="cdArc" cx="22" cy="22" r="19"/></svg><span id="cdNum">5</span></div>
           <div style="font:600 12px/1.6 var(--ui);color:var(--slate)">
             <b style="color:var(--text)">Lv${target}・${LEVELS[target-1].name}</b> に自動で移ります。<br>
-            ポイント（${G.score}）とうんどう時間（${fmtTime(sec)}）はそのまま引き継ぎます。${
-              toNext ? `のこりも ${G.lives} のままです。` : `のこりは 5 にもどります。`}
+            ポイント（${G.score}）と運動時間（${fmtTime(sec)}）はそのまま引き継ぎます。${
+              toNext ? `残りも ${G.lives} のままです。` : `残りは 5 に戻ります。`}
           </div>
         </div>
       </div>
-      <button class="cta" id="go2">いますぐ${toNext?`Lv${target}へ`:"再開する"}</button>` : ""}
-    <button class="${auto?"ghost":"cta"}" id="again">はじめから（ポイントと時間をリセット）</button>
-    <button class="ghost" id="home">メニューにもどる</button>
+      <button class="cta" id="go2">今すぐ${toNext?`Lv${target}へ`:"再開する"}</button>` : ""}
+    <button class="${auto?"ghost":"cta"}" id="again">最初から（ポイントと時間をリセット）</button>
+    <button class="ghost" id="home">メニューに戻る</button>
     <div class="card" style="margin-top:14px"><h2>記録 上位5件</h2>${recordsTable()}</div>
   `);
 
@@ -1178,7 +1179,7 @@ $("#btnCam").onclick = async ()=>{
 function doPause(){
   if(G.state==="playing"){ G.state="paused"; Sound.stopBgm();
     showPanel(`<p class="eyebrow">PAUSED</p><h1>中断中</h1>
-      <p class="lede">休憩をとってから再開してください。</p>
+      <p class="lede">休憩を取ってから再開してください。</p>
       <button class="cta" id="res">再開する</button>
       <button class="ghost" id="quit">やめて記録する</button>`);
     $("#res").onclick = ()=>{ hidePanel(); G.state="playing"; G.startAt = now()-G.sec*1000; Sound.resume(); Sound.startBgm(); };
