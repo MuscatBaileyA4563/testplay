@@ -49,9 +49,19 @@ button{font-family:inherit;color:inherit;cursor:pointer}
 #vLives span{color:var(--coral)} #vScore span{color:var(--amber)} #vLevel span{color:var(--teal)}
 
 #effort{position:absolute;left:12px;right:12px;bottom:calc(env(safe-area-inset-bottom) + 112px);
-  height:6px;border-radius:99px;background:rgba(255,255,255,.08);overflow:hidden;z-index:5;pointer-events:none}
-#effortFill{height:100%;width:0%;border-radius:99px;
-  background:linear-gradient(90deg,var(--teal),var(--amber));transition:width .12s linear}
+  height:8px;z-index:5;pointer-events:none;display:flex;gap:6px}
+.lane{flex:1;height:100%;border-radius:99px;background:rgba(255,255,255,.08);overflow:hidden;display:flex}
+.lane.l{justify-content:flex-end}
+.lane i{display:block;height:100%;width:0%;border-radius:99px;transition:width .09s linear}
+.lane.l i{background:linear-gradient(270deg,var(--teal),rgba(61,214,192,.35))}
+.lane.r i{background:linear-gradient(90deg,var(--amber),rgba(255,194,75,.35))}
+#legLbl{position:absolute;left:12px;right:12px;bottom:calc(env(safe-area-inset-bottom) + 122px);
+  z-index:5;pointer-events:none;display:flex;justify-content:space-between;
+  font:700 9px/1 var(--ui);letter-spacing:.24em;color:rgba(255,255,255,.38)}
+.calbar{height:10px;border-radius:99px;background:rgba(255,255,255,.08);overflow:hidden;margin-top:6px}
+.calbar i{display:block;height:100%;width:0%;border-radius:99px;background:var(--teal);transition:width .08s linear}
+.calbar.r i{background:var(--amber)}
+.callbl{font:700 9px/1 var(--ui);letter-spacing:.2em;color:var(--slate);margin-top:10px}
 
 #hint{position:absolute;left:0;right:0;bottom:calc(env(safe-area-inset-bottom) + 126px);text-align:center;
   z-index:5;pointer-events:none;font:700 11px/1 var(--ui);letter-spacing:.3em;color:rgba(255,255,255,.42)}
@@ -135,7 +145,7 @@ input[type=range]::-moz-range-thumb{width:20px;height:20px;border:none;border-ra
   z-index:20;background:var(--panel);border:1px solid var(--line);border-radius:99px;padding:10px 20px;
   font:700 12px/1 var(--ui);backdrop-filter:blur(8px);opacity:0;transition:opacity .3s;pointer-events:none}
 #toast.show{opacity:1}
-.ui-hidden #topbar,.ui-hidden #tools,.ui-hidden #effort,.ui-hidden #hint,.ui-hidden #spBadge{display:none}
+.ui-hidden #topbar,.ui-hidden #tools,.ui-hidden #effort,.ui-hidden #legLbl,.ui-hidden #hint,.ui-hidden #spBadge{display:none}
 @media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
 </style>
 </head>
@@ -151,8 +161,9 @@ input[type=range]::-moz-range-thumb{width:20px;height:20px;border:none;border-ra
     <div class="stat" id="vLives"><b>のこり</b><span>5</span></div>
   </div>
 
-  <div id="effort"><div id="effortFill"></div></div>
-  <div id="hint">ひざを上げて左右に動かす</div>
+  <div id="effort"><div class="lane l"><i id="legL"></i></div><div class="lane r"><i id="legR"></i></div></div>
+  <div id="legLbl"><span>ひだり足</span><span>みぎ足</span></div>
+  <div id="hint">足を上げるとバーが動く</div>
 
   <div id="spBadge"><i>ボールの速さ</i><b id="spBadgeVal">N</b><em id="spBadgeMul">×1.00</em></div>
 
@@ -217,7 +228,12 @@ const S = {
   load(){ try{ return JSON.parse(localStorage.getItem("kb.cfg")||"{}"); }catch(e){ return {}; } },
   save(o){ try{ localStorage.setItem("kb.cfg", JSON.stringify(o)); }catch(e){} }
 };
-const cfg = Object.assign({sound:true, bgm:true, speed:"mid", dim:0.55, facing:"environment", level:1}, S.load());
+const cfg = Object.assign({sound:true, bgm:true, speed:"mid", dim:0.55, facing:"environment", level:1,
+  ctrl:"kick",      // kick = ひざ上げ（蹴り上げ）操作 ／ slide = 従来の左右操作
+  lift:0.40,        // 足上げの高さ（判定ラインの位置）0=低い … 1=高い
+  assist:true,      // 足を止めたときバーがボールへゆっくり寄る
+  swapLR:false      // 画面の左右と足の左右が逆のとき
+}, S.load());
 const saveCfg = () => S.save(cfg);
 
 /* ---------- 記録（上位5件） ---------- */
@@ -303,6 +319,10 @@ const Sound = {
 
   /* ---------- 効果音 ---------- */
   paddle(){ this.blip(420,0.09,"triangle",0.42,null,760); },
+  kick(){ this.noise(0.16,0.34,300,"lowpass",null,null,0.9); this.blip(190,0.15,"sine",0.32,null,95); },
+  nice(){ if(!this.ctx) return; const t=this.ctx.currentTime;
+    this.blip(880,0.09,"triangle",0.30,null,null,t);
+    this.blip(1320,0.13,"triangle",0.24,null,null,t+0.08); },
   brick(hp){ this.blip(560+hp*130,0.06,"square",0.26); this.noise(0.03,0.10,3000,"highpass"); },
   /* ブロック破壊：気圧が抜けるような「パン！」 */
   breakB(){
@@ -464,9 +484,15 @@ const Sound = {
       認識範囲は従来どおり「カメラ映像の下部30%」＝ videoの生フレームを直接読む。
       画面側の暗転フィルタ（CSS/描画）は検出に一切影響しない。
    =========================================================== */
-const MW = 64, MH = 48, MREGION = 15;      // 検出解像度と下部領域の行数（≒31%）
+const MW = 64, MH = 48;
+const MREGION   = 30;                      // 読み戻す下部領域（≒62%）＝ひざ上げの可動域を含む
+const SLIDE_ROWS = 15;                     // 「よこ操作」で使う範囲は従来どおり下部約31%
 const DIFF_THRESHOLD = 0.115;              // 0..1 の輝度差
 const MOTION_MIN = 14;                     // 有効とみなす動きピクセル数
+const KICK_NORM = 9;                       // 足上げエネルギーの正規化係数
+/* 判定ライン（この高さより上に出た動きだけを「足上げ」とみなす）。r は下端が0 */
+const kickLineRow = () => Math.round(MREGION * (0.22 + clamp(cfg.lift,0,1)*0.50));
+const kickLineY   = () => 1 - (kickLineRow()+0.5)/MH;   // 画面上端からの比率
 
 class MotionGPU {
   constructor(video){
@@ -577,22 +603,54 @@ class Motion2D {          // WebGL2 が無い環境向けフォールバック
   dispose(){}
 }
 
-/* 差分バッファ → 操作入力 */
-function analyze(px, mirror, state){
-  if(!px) return state;
-  let sum=0, count=0, energy=0;
-  for(let i=0;i<px.length;i+=4){
-    const d = px[i]/255;
-    if(d > DIFF_THRESHOLD){ sum += (i/4)%MW; count++; energy += d; }
+/* 差分バッファ → 操作入力
+   kick  : 判定ラインより「上」に出た動きだけを拾い、左半分／右半分を別々に集計する。
+           足を横に振っても（＝ラインより下のまま動かしても）入力にならない。
+   slide : 従来どおり下部31%の動きの重心（左右位置）でバーを動かす。 */
+function analyze(px, mirror, st){
+  st.kickL = st.kickR = false;
+  if(!px){ st.L*=0.90; st.R*=0.90; st.low*=0.90; st.intensity*=0.90; return st; }
+
+  if(cfg.ctrl === "slide"){
+    let sum=0, count=0, energy=0;
+    for(let r=0;r<SLIDE_ROWS;r++){
+      for(let x=0;x<MW;x++){
+        const d = px[(r*MW+x)*4]/255;
+        if(d > DIFF_THRESHOLD){ sum += x; count++; energy += d; }
+      }
+    }
+    if(count > MOTION_MIN){
+      const raw = (sum/count)/MW;
+      st.x = mirror ? 1-raw : raw;
+      st.intensity = clamp(energy/40, 0, 1);
+    } else st.intensity *= 0.88;
+    st.L = st.R = st.intensity; st.low = 0;
+    return st;
   }
-  if(count > MOTION_MIN){
-    const raw = (sum/count)/MW;
-    state.x = mirror ? 1-raw : raw;
-    state.intensity = clamp(energy/40, 0, 1);
-  } else {
-    state.intensity *= 0.88;
+
+  const line = kickLineRow(), half = MW/2, span = Math.max(1, MREGION-line);
+  let hiA=0, hiB=0, low=0, energy=0, count=0;
+  for(let r=0;r<MREGION;r++){
+    const w = r>=line ? 1 + (r-line)/span : 0;      // 高く上げるほど大きく効く
+    for(let x=0;x<MW;x++){
+      const d = px[(r*MW+x)*4]/255;
+      if(d <= DIFF_THRESHOLD) continue;
+      count++; energy += d;
+      if(w === 0){ low += d; continue; }            // ライン下＝横ぶり成分
+      if(x < half) hiA += d*w; else hiB += d*w;
+    }
   }
-  return state;
+  let rawL = clamp(hiA/KICK_NORM, 0, 1), rawR = clamp(hiB/KICK_NORM, 0, 1);
+  if(mirror !== !!cfg.swapLR){ const t = rawL; rawL = rawR; rawR = t; }
+
+  const pL = st.L, pR = st.R;
+  const sm = (cur,raw)=> cur + (raw-cur)*(raw>cur ? 0.55 : 0.10);   // 速い立ち上がり／ゆっくり減衰
+  st.L = sm(st.L, rawL); st.R = sm(st.R, rawR);
+  st.kickL = (rawL > 0.42 && pL < 0.24);            // 蹴り上げの瞬間
+  st.kickR = (rawR > 0.42 && pR < 0.24);
+  st.low = clamp(low/14, 0, 1);
+  st.intensity = count > MOTION_MIN ? clamp(energy/40, 0, 1) : st.intensity*0.90;
+  return st;
 }
 
 /* ===========================================================
@@ -728,7 +786,8 @@ const G = {
   paddle:{x:0,w:120,h:14,y:0},
   ball:{x:0,y:0,vx:0,vy:0,r:12,live:false},
   trail:[], blocks:[], hearts:[], particles:[],
-  input:{x:0.5,intensity:0},
+  input:{x:0.5,intensity:0,L:0,R:0,low:0,kickL:false,kickR:false},
+  pv:0, drive:0, lowStreak:0, praiseAt:0,
   motion:null, stream:null, camReady:false, keyX:null,
   sid:0, cdTimer:null,
   flash:0, lastT:0, launchAt:0
@@ -789,6 +848,8 @@ function startLevel(level, carry){
     G.sid = Date.now(); Sound.resetBgm();
   }
   G.paddle.x = (G.W - G.paddle.w)/2;
+  G.pv = 0; G.drive = 0; G.lowStreak = 0;
+  setHintDefault();
   buildStage(); resetBall();
   G.state = "playing";
   hidePanel();
@@ -811,15 +872,65 @@ function burst(x,y,col,n){
   }
 }
 
+/* 蹴り上げの瞬間の演出とボーナス */
+function onKick(dir){
+  const p = G.paddle, b = G.ball;
+  G.flash = 1; Sound.kick();
+  burst(p.x + p.w/2 + dir*p.w*0.4, p.y, [0.24,0.84,0.75], 8);
+  if(b.live && b.vy > 0 && b.y > p.y - G.H*0.24 && Math.abs(b.x-(p.x+p.w/2)) < p.w*1.3){
+    G.score += 20; Sound.nice(); flashHint("ナイスキック！", 900); syncHud();
+  }
+}
+
+/* ヒント表示 */
+let hintT = 0;
+function setHintDefault(){
+  const el = $("#hint"); if(!el) return;
+  el.textContent = cfg.ctrl === "kick" ? "みぎ足を上げる→みぎへ／ひだり足→ひだりへ" : "ひざを上げて左右に動かす";
+  el.style.color = "";
+}
+function flashHint(msg, ms){
+  const el = $("#hint"); if(!el) return;
+  el.textContent = msg; el.style.color = "var(--amber)";
+  clearTimeout(hintT); hintT = setTimeout(setHintDefault, ms||1500);
+}
+
 function update(dt){
   if(G.state!=="playing") return;
   const p = G.paddle, b = G.ball, L = LEVELS[G.level-1];
 
   // 入力（カメラ or キーボード）
   // カメラ接続中はカメラ入力を優先（タッチ／キーは補助）
-  const src = (!G.camReady && G.keyX!==null) ? G.keyX : G.input.x;
-  const tx = src * G.W - p.w/2;
-  p.x += (tx - p.x) * Math.min(1, 0.34*dt);
+  if(!G.camReady && G.keyX!==null){
+    const tx = G.keyX * G.W - p.w/2;
+    p.x += (tx - p.x) * Math.min(1, 0.34*dt);
+    G.drive = 0; G.pv = 0;
+  } else if(cfg.ctrl === "kick"){
+    /* キック操作：ひざを上げた側へバーが「押し出される」速度制御。
+       足を止めれば止まるので、上げ下げを繰り返すほど動かせる。 */
+    const raw   = G.input.R - G.input.L;
+    const drive = Math.abs(raw) < 0.10 ? 0 : clamp(raw*1.7, -1, 1);
+    G.drive = drive;
+    const vmax = G.W * 0.0135;
+    G.pv += (drive*vmax - G.pv) * Math.min(1, 0.22*dt);
+    if(G.input.kickR){ G.pv += vmax*1.6; onKick( 1); }
+    if(G.input.kickL){ G.pv -= vmax*1.6; onKick(-1); }
+    if(cfg.assist && drive === 0 && b.live){       // アシスト：足を止めるとボールへゆっくり寄る
+      const d = b.x - (p.x + p.w/2);
+      G.pv += clamp(d*0.02, -vmax*0.30, vmax*0.30) * Math.min(1, dt);
+    }
+    G.pv = clamp(G.pv, -vmax*2.4, vmax*2.4);
+    p.x += G.pv * dt;
+    if(p.x < 0 || p.x > G.W-p.w) G.pv *= 0.2;
+    // 横ぶりだけが続いているときのコーチング
+    if(G.input.low > 0.35 && Math.max(G.input.L,G.input.R) < 0.12) G.lowStreak += dt;
+    else G.lowStreak = Math.max(0, G.lowStreak - dt*0.5);
+    if(G.lowStreak > 110){ G.lowStreak = 0; flashHint("よこに振らず、ひざを上げて！", 2200); }
+  } else {
+    const tx = G.input.x * G.W - p.w/2;
+    p.x += (tx - p.x) * Math.min(1, 0.34*dt);
+    G.drive = 0;
+  }
   p.x = clamp(p.x, 0, G.W-p.w);
 
   // 時間
@@ -900,7 +1011,22 @@ function draw(){
 
   if(G.state==="playing" || G.state==="paused"){
     // 認識ラインの目安
-    R.flat(0, G.H*0.70, G.W, 1, [0.24,0.84,0.75,0.16]);
+    if(cfg.ctrl === "kick"){
+      const ly = G.H * kickLineY();
+      for(let x=6; x<G.W-6; x+=26) R.flat(x, ly, 15, 2, [1,0.76,0.29,0.30]);
+      const p0 = G.paddle;
+      if(Math.abs(G.drive) > 0.10){          // 押されている向きを光で示す
+        const s = Math.abs(G.drive);
+        const cx = G.drive>0 ? p0.x+p0.w+14 : p0.x-14;
+        R.halo(cx, p0.y+p0.h/2, 14+22*s, [1,0.76,0.29, 0.18+0.36*s]);
+      }
+      // 足ゲージ（画面のいちばん下）
+      const gh = 6, gy = G.H - gh - 4, gw = G.W/2 - 8;
+      R.rect(6, gy, gw*G.input.L, gh, [0.24,0.84,0.75,0.55]);
+      R.rect(G.W-6-gw*G.input.R, gy, gw*G.input.R, gh, [1,0.76,0.29,0.55]);
+    } else {
+      R.flat(0, G.H*0.70, G.W, 1, [0.24,0.84,0.75,0.16]);
+    }
 
     for(const k of G.blocks){
       const base = k.solid ? HP_COLOR[0] : HP_COLOR[k.hp] || HP_COLOR[1];
@@ -950,9 +1076,17 @@ setInterval(()=>{
   if(G.state==="playing"){
     $("#vTime span").textContent = fmtTime(G.sec);
     $("#vScore span").textContent = G.score;
-    $("#effortFill").style.width = (G.input.intensity*100).toFixed(0)+"%";
   }
 }, 200);
+/* 足ゲージと調整画面のライブ表示 */
+setInterval(()=>{
+  const l = $("#legL"), r = $("#legR");
+  if(l){ l.style.width = (G.input.L*100).toFixed(0)+"%"; }
+  if(r){ r.style.width = (G.input.R*100).toFixed(0)+"%"; }
+  const cl = $("#calL"), cr = $("#calR");
+  if(cl){ cl.style.width = (G.input.L*100).toFixed(0)+"%"; }
+  if(cr){ cr.style.width = (G.input.R*100).toFixed(0)+"%"; }
+}, 80);
 
 /* --- カメラ --- */
 async function startCamera(facing){
@@ -1002,7 +1136,8 @@ function menu(){
   showPanel(`
     <p class="eyebrow">EXERCISE THERAPY</p>
     <h1>ブロック崩し<em>de</em>足トレ</h1>
-    <p class="lede">カメラの前に立ち、ひざを高く上げながら左右に体重を移します。動いた位置にバーが追従します。座ったままでも、足踏みで操作できます。</p>
+    <p class="lede">あお向けのままスマホを足もとに固定し、<b style="color:var(--text)">ひざを交互に高く上げて（蹴り上げて）</b>バーを動かします。
+    みぎ足を上げるとバーはみぎへ、ひだり足を上げるとひだりへ。足を横に振っても動きません。</p>
 
     <div class="card">
       <h2>レベル（全10段階）</h2>
@@ -1032,6 +1167,18 @@ function menu(){
           ${SPEED_ORDER.map(k=>`<button class="seg" data-s="${k}" data-sel="${cfg.speed===k?1:0}">${SPEEDS[k].n}<small>×${speedRel(k).toFixed(2)}</small></button>`).join("")}
         </div>
       </div>
+      <div class="row" style="display:block">
+        <span>操作のしかた</span>
+        <div class="segs" id="ctrlSegs" style="grid-template-columns:1fr 1fr">
+          <button class="seg" data-c="kick"  data-sel="${cfg.ctrl==="kick"?1:0}">キック<small>ひざ上げで左右へ</small></button>
+          <button class="seg" data-c="slide" data-sel="${cfg.ctrl==="slide"?1:0}">よこ<small>従来（動いた位置へ）</small></button>
+        </div>
+      </div>
+      <div class="row"><span>足上げの高さ<small style="display:block;font:500 10px/1.4 var(--ui);color:var(--slate)">高くするほど大きく上げる必要があります</small></span>
+        <input type="range" id="lift" min="0" max="1" step="0.05" value="${cfg.lift}"></div>
+      <div class="row"><span>アシスト<small style="display:block;font:500 10px/1.4 var(--ui);color:var(--slate)">足を止めるとバーがボールへ寄る</small></span>
+        <button class="sw" id="swAsst" data-on="${cfg.assist?1:0}"></button></div>
+      <div class="row"><span>足と画面の左右を入れかえる</span><button class="sw" id="swSwap" data-on="${cfg.swapLR?1:0}"></button></div>
       <div class="row"><span>画面を暗くする</span><input type="range" id="dim" min="0" max="0.85" step="0.05" value="${cfg.dim}"></div>
       <div class="row"><span>カメラ</span><button class="ghost" style="width:auto;padding:9px 16px;margin:0" id="face">${cfg.facing==="user"?"インカメラ":"アウトカメラ"}</button></div>
       <div class="row" id="rowInstall" style="display:none"><span>ホーム画面に追加</span>
@@ -1040,6 +1187,7 @@ function menu(){
     <p class="empty" style="text-align:center">描画：${GPU_RENDER?"WebGL2（GPU）":"Canvas 2D"} ／ 動作検出：GPUシェーダ差分</p>
   `);
 
+  setHintDefault();
   const setName = ()=> $("#lvname").innerHTML = `<b>Lv${G.level}・${LEVELS[G.level-1].name}</b>　ボール速度 ×${(LEVELS[G.level-1].speed*speedRel(cfg.speed)).toFixed(2)}（${SPEEDS[cfg.speed].n}）／バー幅 ${(LEVELS[G.level-1].paddle*100)|0}%`;
   setName();
   $("#levels").addEventListener("click", e=>{
@@ -1065,6 +1213,15 @@ function menu(){
     setName();
     Sound.resume(); Sound.blip(700,0.06,"triangle",0.2);
   });
+  $("#ctrlSegs").addEventListener("click", e=>{
+    const t = e.target.closest(".seg"); if(!t) return;
+    cfg.ctrl = t.dataset.c; saveCfg(); setHintDefault();
+    [...document.querySelectorAll("#ctrlSegs .seg")].forEach(b=> b.dataset.sel = (b.dataset.c===cfg.ctrl)?1:0);
+    Sound.resume(); Sound.blip(700,0.06,"triangle",0.2);
+  });
+  $("#lift").oninput  = e=>{ cfg.lift=+e.target.value; saveCfg(); };
+  $("#swAsst").onclick = e=>{ cfg.assist=!cfg.assist; e.currentTarget.dataset.on=cfg.assist?1:0; saveCfg(); };
+  $("#swSwap").onclick = e=>{ cfg.swapLR=!cfg.swapLR; e.currentTarget.dataset.on=cfg.swapLR?1:0; saveCfg(); };
   $("#dim").oninput = e=>{ cfg.dim=+e.target.value; saveCfg(); };
   $("#face").onclick = async e=>{
     cfg.facing = cfg.facing==="user"?"environment":"user"; saveCfg();
@@ -1179,9 +1336,27 @@ function doPause(){
   if(G.state==="playing"){ G.state="paused"; Sound.stopBgm();
     showPanel(`<p class="eyebrow">PAUSED</p><h1>中断中</h1>
       <p class="lede">休憩をとってから再開してください。</p>
+      ${cfg.ctrl==="kick" ? `
+      <div class="card">
+        <h2>足上げの調整（そのまま動かして確認）</h2>
+        <div class="row" style="display:block;border:none;padding-top:0">
+          <span>足上げの高さ</span>
+          <input type="range" id="lift2" min="0" max="1" step="0.05" value="${cfg.lift}" style="width:100%;margin-top:10px">
+        </div>
+        <p class="callbl">ひだり足</p><div class="calbar"><i id="calL"></i></div>
+        <p class="callbl">みぎ足</p><div class="calbar r"><i id="calR"></i></div>
+        <p class="empty" style="margin-top:12px">ひざを上げたときだけバーがのびる高さに合わせてください。バーがのびないときは数値を下げます。</p>
+        <div class="row"><span>アシスト</span><button class="sw" id="swAsst2" data-on="${cfg.assist?1:0}"></button></div>
+        <div class="row"><span>足と画面の左右を入れかえる</span><button class="sw" id="swSwap2" data-on="${cfg.swapLR?1:0}"></button></div>
+      </div>` : ""}
       <button class="cta" id="res">再開する</button>
       <button class="ghost" id="quit">やめて記録する</button>`);
-    $("#res").onclick = ()=>{ hidePanel(); G.state="playing"; G.startAt = now()-G.sec*1000; Sound.resume(); Sound.startBgm(); };
+    if($("#lift2")){
+      $("#lift2").oninput  = e=>{ cfg.lift=+e.target.value; saveCfg(); };
+      $("#swAsst2").onclick = e=>{ cfg.assist=!cfg.assist; e.currentTarget.dataset.on=cfg.assist?1:0; saveCfg(); };
+      $("#swSwap2").onclick = e=>{ cfg.swapLR=!cfg.swapLR; e.currentTarget.dataset.on=cfg.swapLR?1:0; saveCfg(); };
+    }
+    $("#res").onclick = ()=>{ hidePanel(); G.state="playing"; G.pv=0; G.startAt = now()-G.sec*1000; Sound.resume(); Sound.startBgm(); };
     $("#quit").onclick = ()=> endGame(false, true);
   }
 }
