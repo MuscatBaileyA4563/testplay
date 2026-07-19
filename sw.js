@@ -1,6 +1,6 @@
-/* ニーアップ・ブレイカー / Service Worker
+/* ブロック崩しde足トレ / Service Worker
    相対パスで登録するため、GitHub Pages のサブディレクトリ配信でもそのまま動作します。 */
-const CACHE = "knee-up-breakout-v1";
+const CACHE = "knee-up-breakout-v2";
 const ASSETS = [
   "./", "./index.html", "./manifest.webmanifest",
   "./icon-192.png", "./icon-512.png", "./icon-maskable.png"

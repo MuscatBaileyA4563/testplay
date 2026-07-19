@@ -1,6 +1,6 @@
 {
-  "name": "ニーアップ・ブレイカー",
-  "short_name": "ニーアップ",
+  "name": "ブロック崩しde足トレ",
+  "short_name": "足トレ",
   "description": "ひざ上げ運動で操作する運動療法用ブロック崩し。カメラの動作差分でバーを動かします。",
   "start_url": "./index.html",
   "scope": "./",

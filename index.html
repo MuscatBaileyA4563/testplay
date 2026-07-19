@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
-<title>ニーアップ・ブレイカー | 運動療法アプリ</title>
+<title>ブロック崩しde足トレ | 運動療法アプリ</title>
 <meta name="theme-color" content="#080B14" />
 <meta name="mobile-web-app-capable" content="yes" />
 <meta name="apple-mobile-web-app-capable" content="yes" />
@@ -48,20 +48,34 @@ button{font-family:inherit;color:inherit;cursor:pointer}
 .stat span{display:block;font:700 20px/1.15 var(--num);font-variant-numeric:tabular-nums}
 #vLives span{color:var(--coral)} #vScore span{color:var(--amber)} #vLevel span{color:var(--teal)}
 
-#effort{position:absolute;left:12px;right:12px;bottom:calc(env(safe-area-inset-bottom) + 74px);
+#effort{position:absolute;left:12px;right:12px;bottom:calc(env(safe-area-inset-bottom) + 112px);
   height:6px;border-radius:99px;background:rgba(255,255,255,.08);overflow:hidden;z-index:5;pointer-events:none}
 #effortFill{height:100%;width:0%;border-radius:99px;
   background:linear-gradient(90deg,var(--teal),var(--amber));transition:width .12s linear}
 
-#hint{position:absolute;left:0;right:0;bottom:calc(env(safe-area-inset-bottom) + 90px);text-align:center;
+#hint{position:absolute;left:0;right:0;bottom:calc(env(safe-area-inset-bottom) + 126px);text-align:center;
   z-index:5;pointer-events:none;font:700 11px/1 var(--ui);letter-spacing:.3em;color:rgba(255,255,255,.42)}
 
 #tools{position:absolute;right:12px;bottom:calc(env(safe-area-inset-bottom) + 12px);z-index:6;
   display:flex;gap:8px}
+#spBadge{position:absolute;right:12px;bottom:calc(env(safe-area-inset-bottom) + 72px);z-index:6;
+  display:flex;align-items:center;gap:9px;padding:8px 14px;border-radius:99px;
+  background:var(--panel);border:1px solid var(--line);backdrop-filter:blur(8px)}
+#spBadge i{font:700 9px/1 var(--ui);font-style:normal;letter-spacing:.18em;color:var(--slate)}
+#spBadge b{font:800 17px/1 var(--num)}
+#spBadge em{font:700 11px/1 var(--num);font-style:normal;color:var(--slate);font-variant-numeric:tabular-nums}
 .tool{width:52px;height:52px;border-radius:16px;background:var(--panel);border:1px solid var(--line);
   display:grid;place-items:center;font-size:20px;backdrop-filter:blur(8px)}
 .tool:active{transform:scale(.93)}
 .tool.on{border-color:var(--teal);color:var(--teal)}
+#btnSpeed{flex-direction:column;gap:1px;display:flex;align-items:center;justify-content:center}
+#btnSpeed b{font:800 19px/1 var(--ui)}
+#btnSpeed i{font:700 7px/1 var(--ui);font-style:normal;letter-spacing:.14em;color:var(--slate)}
+.segs{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:10px}
+.seg{border:1px solid var(--line);background:rgba(255,255,255,.04);border-radius:14px;padding:11px 6px;font:700 14px/1.3 var(--ui);text-align:center}
+.seg small{display:block;margin-top:3px;font:600 10px/1 var(--num);color:var(--slate)}
+.seg[data-sel="1"]{background:var(--teal);border-color:var(--teal);color:#03231F}
+.seg[data-sel="1"] small{color:#04352F}
 
 /* --- パネル --- */
 #panel{position:absolute;inset:0;z-index:10;overflow-y:auto;overscroll-behavior:contain;
@@ -105,6 +119,12 @@ tr td:nth-child(1){color:var(--slate);font-size:11px}
 input[type=range]{-webkit-appearance:none;width:150px;height:4px;border-radius:99px;background:rgba(255,255,255,.15)}
 input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:20px;height:20px;border-radius:50%;background:var(--teal)}
 input[type=range]::-moz-range-thumb{width:20px;height:20px;border:none;border-radius:50%;background:var(--teal)}
+.ring{position:relative;width:64px;height:64px;flex:none}
+.ring svg{width:64px;height:64px;transform:rotate(-90deg)}
+.ring circle{fill:none;stroke-width:3.5}
+.ring .bg{stroke:rgba(255,255,255,.10)}
+.ring .fg{stroke:var(--amber);stroke-linecap:round;transition:stroke-dashoffset .95s linear}
+.ring span{position:absolute;inset:0;display:grid;place-items:center;font:800 24px/1 var(--num);color:var(--amber)}
 .big{text-align:center;padding:8px 0 18px}
 .big .n{font:800 62px/1 var(--num);font-variant-numeric:tabular-nums;letter-spacing:-.03em}
 .big .u{font:700 10px/1 var(--ui);letter-spacing:.34em;color:var(--slate);margin-top:10px}
@@ -115,7 +135,7 @@ input[type=range]::-moz-range-thumb{width:20px;height:20px;border:none;border-ra
   z-index:20;background:var(--panel);border:1px solid var(--line);border-radius:99px;padding:10px 20px;
   font:700 12px/1 var(--ui);backdrop-filter:blur(8px);opacity:0;transition:opacity .3s;pointer-events:none}
 #toast.show{opacity:1}
-.ui-hidden #topbar,.ui-hidden #tools,.ui-hidden #effort,.ui-hidden #hint{display:none}
+.ui-hidden #topbar,.ui-hidden #tools,.ui-hidden #effort,.ui-hidden #hint,.ui-hidden #spBadge{display:none}
 @media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
 </style>
 </head>
@@ -134,8 +154,11 @@ input[type=range]::-moz-range-thumb{width:20px;height:20px;border:none;border-ra
   <div id="effort"><div id="effortFill"></div></div>
   <div id="hint">ひざを上げて左右に動かす</div>
 
+  <div id="spBadge"><i>ボールの速さ</i><b id="spBadgeVal">N</b><em id="spBadgeMul">×1.00</em></div>
+
   <div id="tools">
     <button class="tool" id="btnSound" title="音">🔊</button>
+    <button class="tool" id="btnSpeed" title="ボールの速さ"><b id="spLbl">N</b><i>はやさ</i></button>
     <button class="tool" id="btnCam" title="カメラ切替">🔄</button>
     <button class="tool" id="btnPause" title="中断">⏸</button>
   </div>
@@ -147,7 +170,7 @@ input[type=range]::-moz-range-thumb{width:20px;height:20px;border:none;border-ra
 <script>
 "use strict";
 /* ===========================================================
-   ニーアップ・ブレイカー / 運動療法用ブロック崩し
+   ブロック崩しde足トレ / 運動療法用ブロック崩し
    - 描画：WebGL2（2Dキャンバスへ自動フォールバック）
    - 動作検出：WebGL2フラグメントシェーダによるフレーム間差分
    - 記録：localStorage（上位5件を自動登録）
@@ -181,6 +204,12 @@ const LEVELS = [
  {name:"要塞",            speed:1.70, paddle:0.30, drop:0.10, rows:[
    "#2....2#","23333332","33#33#33","23333332",".2#..#2.","11111111"]},
 ];
+/* ボールの速さ：3段階（初期値は従来と同じ「速」） */
+const SPEEDS = { slow:{n:"L", m:0.62, c:"var(--teal)"}, mid:{n:"N", m:0.80, c:"var(--amber)"}, fast:{n:"H", m:1.00, c:"var(--coral)"} };
+const SPEED_ORDER = ["slow","mid","fast"];
+// 表示は N を基準（×1.00）にした相対値。内部の実速度は SPEEDS[].m のまま
+const speedRel = k => SPEEDS[k].m / SPEEDS.mid.m;
+
 const HP_COLOR = {1:[0.24,0.84,0.75], 2:[1.00,0.76,0.29], 3:[1.00,0.36,0.45], 0:[0.34,0.39,0.48]};
 
 /* ---------- 設定の保存 ---------- */
@@ -188,7 +217,7 @@ const S = {
   load(){ try{ return JSON.parse(localStorage.getItem("kb.cfg")||"{}"); }catch(e){ return {}; } },
   save(o){ try{ localStorage.setItem("kb.cfg", JSON.stringify(o)); }catch(e){} }
 };
-const cfg = Object.assign({sound:true, bgm:true, dim:0.55, facing:"environment", level:1}, S.load());
+const cfg = Object.assign({sound:true, bgm:true, speed:"mid", dim:0.55, facing:"environment", level:1}, S.load());
 const saveCfg = () => S.save(cfg);
 
 /* ---------- 記録（上位5件） ---------- */
@@ -196,7 +225,7 @@ const Records = {
   key:"kb.records",
   all(){ try{ return JSON.parse(localStorage.getItem(this.key)||"[]"); }catch(e){ return []; } },
   add(rec){
-    const list = this.all();
+    const list = this.all().filter(r => !(rec.sid && r.sid === rec.sid)); // 同じセッションの記録は最新で置き換える
     list.push(rec);
     list.sort((a,b)=> b.score-a.score || b.sec-a.sec);
     const top = list.slice(0,5);
@@ -212,22 +241,46 @@ const fmtDate = t => { const d=new Date(t);
 /* ===========================================================
    1. サウンド（Web Audio で合成：外部ファイル不要＝オフライン可）
    =========================================================== */
+/* --- BGM：128BPM・8セクション約2分のエレクトロ構成をリアルタイム合成（音源ファイル不要） --- */
+const SONG = [
+  {name:"イントロ",      bars:8},
+  {name:"Aメロ",        bars:8},
+  {name:"Bメロ",        bars:8},
+  {name:"サビ",         bars:8},
+  {name:"間奏",         bars:8},
+  {name:"Bメロ",        bars:8},
+  {name:"サビ",         bars:8},
+  {name:"アウトロ",      bars:8}
+];
+const CHORD_ROOTS = [65, 67, 64, 69];                 // F G Em Am
+const CHORD_NOTES = [[65,69,72,76],[67,71,74,79],[64,67,71,74],[69,72,76,79]];
+const CHORUS_MEL  = [
+  [72,76,79,-1,79,76,72,-1],
+  [71,74,79,-1,79,-1,83,-1],
+  [71,74,79,-1,79,74,71,-1],
+  [81,-1,79,-1,76,-1,72,76]
+];
+
 const Sound = {
-  ctx:null, master:null, bgmGain:null, sfxGain:null, timer:null, step:0, bpm:112,
+  ctx:null, master:null, bgmGain:null, sfxGain:null,
+  side:null, delay:null, noiseBuf:null, bgmReady:false,
+  timer:null, step:0, nextT:0, tempo:128,
   init(){
     if(this.ctx) return;
     const AC = window.AudioContext || window.webkitAudioContext;
     if(!AC) return;
     this.ctx = new AC();
     this.master = this.ctx.createGain(); this.master.gain.value = cfg.sound?0.9:0; this.master.connect(this.ctx.destination);
-    this.bgmGain = this.ctx.createGain(); this.bgmGain.gain.value = 0.16; this.bgmGain.connect(this.master);
-    this.sfxGain = this.ctx.createGain(); this.sfxGain.gain.value = 0.55; this.sfxGain.connect(this.master);
+    this.bgmGain = this.ctx.createGain(); this.bgmGain.gain.value = 0.30; this.bgmGain.connect(this.master);
+    this.sfxGain = this.ctx.createGain(); this.sfxGain.gain.value = 0.6; this.sfxGain.connect(this.master);
   },
   resume(){ this.init(); if(this.ctx && this.ctx.state==="suspended") this.ctx.resume(); },
   setEnabled(on){ this.init(); if(this.master) this.master.gain.value = on?0.9:0; },
-  blip(freq, dur, type, gain, dest, slide){
+
+  /* ---------- 汎用 ---------- */
+  blip(freq, dur, type, gain, dest, slide, at){
     if(!this.ctx || !cfg.sound) return;
-    const t = this.ctx.currentTime;
+    const t = at || this.ctx.currentTime;
     const o = this.ctx.createOscillator(), g = this.ctx.createGain();
     o.type = type||"square"; o.frequency.setValueAtTime(freq, t);
     if(slide) o.frequency.exponentialRampToValueAtTime(Math.max(30,slide), t+dur);
@@ -236,42 +289,172 @@ const Sound = {
     g.gain.exponentialRampToValueAtTime(0.0001, t+dur);
     o.connect(g); g.connect(dest||this.sfxGain); o.start(t); o.stop(t+dur+0.02);
   },
-  noise(dur, gain){
+  noise(dur, gain, freq, type, dest, at, q){
     if(!this.ctx || !cfg.sound) return;
-    const t = this.ctx.currentTime, n = Math.floor(this.ctx.sampleRate*dur);
+    const t = at || this.ctx.currentTime, n = Math.max(1,Math.floor(this.ctx.sampleRate*dur));
     const buf = this.ctx.createBuffer(1,n,this.ctx.sampleRate), d = buf.getChannelData(0);
-    for(let i=0;i<n;i++) d[i] = (Math.random()*2-1) * (1-i/n);
+    for(let i=0;i<n;i++) d[i] = (Math.random()*2-1) * Math.pow(1-i/n, 2.2);
     const src = this.ctx.createBufferSource(); src.buffer = buf;
+    const f = this.ctx.createBiquadFilter(); f.type = type||"bandpass";
+    f.frequency.value = freq||1800; f.Q.value = q||1;
     const g = this.ctx.createGain(); g.gain.value = gain||0.2;
-    const f = this.ctx.createBiquadFilter(); f.type="bandpass"; f.frequency.value=1800;
-    src.connect(f); f.connect(g); g.connect(this.sfxGain); src.start(t);
+    src.connect(f); f.connect(g); g.connect(dest||this.sfxGain); src.start(t);
   },
+
+  /* ---------- 効果音 ---------- */
   paddle(){ this.blip(420,0.09,"triangle",0.42,null,760); },
-  brick(hp){ this.blip(560+hp*130,0.07,"square",0.30); },
-  breakB(){ this.blip(880,0.14,"sawtooth",0.28,null,1500); this.noise(0.10,0.14); },
-  solid(){ this.blip(120,0.10,"square",0.30,null,80); this.noise(0.06,0.10); },
+  brick(hp){ this.blip(560+hp*130,0.06,"square",0.26); this.noise(0.03,0.10,3000,"highpass"); },
+  /* ブロック破壊：気圧が抜けるような「パン！」 */
+  breakB(){
+    if(!this.ctx || !cfg.sound) return;
+    const t = this.ctx.currentTime;
+    // 1) 破裂の芯：一瞬で落ちるサイン
+    const o = this.ctx.createOscillator(), g = this.ctx.createGain();
+    o.type = "sine";
+    o.frequency.setValueAtTime(1500, t);
+    o.frequency.exponentialRampToValueAtTime(180, t+0.055);
+    g.gain.setValueAtTime(0.55, t);
+    g.gain.exponentialRampToValueAtTime(0.0001, t+0.075);
+    o.connect(g); g.connect(this.sfxGain); o.start(t); o.stop(t+0.09);
+    // 2) 空気の抜ける音（超短いノイズ・トランジェント）
+    this.noise(0.045, 0.42, 2600, "bandpass", null, t, 0.8);
+    this.noise(0.020, 0.30, 5200, "highpass", null, t, 1);
+    // 3) 弾けた粒の余韻
+    this.blip(2300, 0.05, "triangle", 0.14, null, 3400, t+0.012);
+  },
+  solid(){ this.blip(120,0.10,"square",0.30,null,80); this.noise(0.06,0.10,900); },
   heart(){ [660,880,1320].forEach((f,i)=>setTimeout(()=>this.blip(f,0.12,"sine",0.34),i*70)); },
   miss(){ this.blip(300,0.5,"sawtooth",0.32,null,60); },
   clear(){ [523,659,784,1046,1318].forEach((f,i)=>setTimeout(()=>this.blip(f,0.22,"triangle",0.34),i*110)); },
   over(){ [392,330,262,196].forEach((f,i)=>setTimeout(()=>this.blip(f,0.34,"sawtooth",0.30),i*180)); },
-  /* --- BGM：ペンタトニックのアルペジオ＋ベース。レベルでテンポが上がる --- */
-  startBgm(level){
+
+  /* ---------- BGM ---------- */
+  mtof(m){ return 440*Math.pow(2,(m-69)/12); },
+  initBgm(){
+    if(this.bgmReady || !this.ctx) return;
+    const c = this.ctx;
+    this.side = c.createGain(); this.side.gain.value = 1.0; this.side.connect(this.bgmGain);
+    this.delay = c.createDelay(); this.delay.delayTime.value = 0.35;
+    const dg = c.createGain(); dg.gain.value = 0.25;
+    this.delay.connect(dg); dg.connect(this.side);
+    const n = Math.floor(c.sampleRate*2);
+    this.noiseBuf = c.createBuffer(1,n,c.sampleRate);
+    const o = this.noiseBuf.getChannelData(0);
+    for(let i=0;i<n;i++) o[i] = Math.random()*2-1;
+    this.bgmReady = true;
+  },
+  duck(t){ // キックに合わせて他パートを沈める（サイドチェイン）
+    this.side.gain.setValueAtTime(0.1, t);
+    this.side.gain.exponentialRampToValueAtTime(1.0, t+0.25);
+  },
+  bKick(t){
+    this.duck(t);
+    const c=this.ctx, o=c.createOscillator(), g=c.createGain();
+    o.type="sine"; o.frequency.setValueAtTime(150,t); o.frequency.exponentialRampToValueAtTime(0.01,t+0.1);
+    g.gain.setValueAtTime(1,t); g.gain.exponentialRampToValueAtTime(0.01,t+0.2);
+    o.connect(g); g.connect(this.bgmGain); o.start(t); o.stop(t+0.2);
+  },
+  bSnare(t){
+    const c=this.ctx;
+    const nz=c.createBufferSource(); nz.buffer=this.noiseBuf;
+    const f=c.createBiquadFilter(); f.type="highpass"; f.frequency.value=1500;
+    const g=c.createGain(); g.gain.setValueAtTime(0.5,t); g.gain.exponentialRampToValueAtTime(0.01,t+0.2);
+    nz.connect(f); f.connect(g); g.connect(this.bgmGain); nz.start(t); nz.stop(t+0.2);
+    const o=c.createOscillator(), og=c.createGain();
+    o.type="triangle"; o.frequency.setValueAtTime(300,t); o.frequency.exponentialRampToValueAtTime(100,t+0.1);
+    og.gain.setValueAtTime(0.8,t); og.gain.exponentialRampToValueAtTime(0.01,t+0.15);
+    o.connect(og); og.connect(this.bgmGain); o.start(t); o.stop(t+0.15);
+  },
+  bHat(t, open){
+    const c=this.ctx, nz=c.createBufferSource(); nz.buffer=this.noiseBuf;
+    const f=c.createBiquadFilter(); f.type="highpass"; f.frequency.value=10000;
+    const g=c.createGain(), d = open?0.2:0.03;
+    g.gain.setValueAtTime(0.2,t); g.gain.exponentialRampToValueAtTime(0.01,t+d);
+    nz.connect(f); f.connect(g); g.connect(this.bgmGain); nz.start(t); nz.stop(t+d);
+  },
+  bBass(t, m){
+    const c=this.ctx, o=c.createOscillator(), f=c.createBiquadFilter(), g=c.createGain();
+    o.type="sawtooth"; o.frequency.value=this.mtof(m-24);
+    f.type="lowpass"; f.frequency.setValueAtTime(800,t); f.frequency.exponentialRampToValueAtTime(100,t+0.2);
+    g.gain.setValueAtTime(0.7,t); g.gain.exponentialRampToValueAtTime(0.01,t+0.3);
+    o.connect(f); f.connect(g); g.connect(this.side); o.start(t); o.stop(t+0.3);
+  },
+  bPluck(t, chord){
+    const c=this.ctx;
+    chord.forEach((note,i)=>{
+      const o=c.createOscillator(), f=c.createBiquadFilter(), g=c.createGain();
+      o.type = i%2===0 ? "square":"sawtooth"; o.frequency.value=this.mtof(note);
+      f.type="lowpass"; f.frequency.setValueAtTime(4000,t); f.frequency.exponentialRampToValueAtTime(300,t+0.1);
+      g.gain.setValueAtTime(0.2,t); g.gain.exponentialRampToValueAtTime(0.01,t+0.15);
+      o.connect(f); f.connect(g); g.connect(this.side); g.connect(this.delay);
+      o.start(t); o.stop(t+0.2);
+    });
+  },
+  bLead(t, m){
+    const c=this.ctx, o=c.createOscillator(), g=c.createGain();
+    o.type="sawtooth"; o.frequency.setValueAtTime(this.mtof(m),t);
+    g.gain.setValueAtTime(0,t); g.gain.linearRampToValueAtTime(0.15,t+0.02);
+    g.gain.exponentialRampToValueAtTime(0.001,t+0.25);
+    o.connect(g); g.connect(this.side); g.connect(this.delay);
+    o.start(t); o.stop(t+0.3);
+  },
+  sectionOf(bar){
+    let acc=0;
+    for(const sec of SONG){ if(bar < acc+sec.bars) return sec.name; acc += sec.bars; }
+    return SONG[0].name;
+  },
+  scheduleStep(step, t){
+    const ls = step % 1024, bar = Math.floor(ls/16), sb = ls % 16;
+    const sec = this.sectionOf(bar);
+    const ci = Math.floor(bar/2) % CHORD_ROOTS.length;
+    const root = CHORD_ROOTS[ci], chord = CHORD_NOTES[ci];
+
+    if(sec === "イントロ"){
+      if(sb===0||sb===6||sb===10) this.bPluck(t, chord);
+      if(sb%8===0) this.bKick(t);
+    } else if(sec === "Aメロ"){
+      if(sb%4===0) this.bKick(t);
+      if(sb%8===4) this.bSnare(t);
+      if(sb%2!==0) this.bHat(t, sb===15);
+      if(sb===0||sb===3||sb===8) this.bPluck(t, chord);
+      if(sb%2===0) this.bBass(t, root);
+    } else if(sec === "Bメロ"){
+      if(sb%4===0) this.bKick(t);
+      const f = (bar%8<4)?8 : (bar%8<6)?4 : (bar%8===6)?2 : 1;  // 徐々に細かくなるビルドアップ
+      if(sb%f===0) this.bSnare(t);
+      if(sb%4===0){ this.bPluck(t, chord); this.bBass(t, root+12); }
+    } else if(sec === "サビ" || sec === "間奏"){
+      if(sb%4===0) this.bKick(t);
+      if(sb%8===4) this.bSnare(t);
+      if(sb%2!==0) this.bHat(t, true);
+      if(sb%4===0 || sb%4===2) this.bBass(t, root);
+      if(sb===0||sb===6||sb===12) this.bPluck(t, chord);
+      if(sec === "サビ" && sb%2===0){
+        const n = CHORUS_MEL[ci][Math.floor(sb/2)];
+        if(n !== -1) this.bLead(t, n);
+      }
+    } else { // アウトロ
+      if(sb===0||sb===6||sb===10) this.bPluck(t, chord);
+      if(sb%2!==0) this.bHat(t, false);
+    }
+  },
+  resetBgm(){ this.step = 0; },
+  startBgm(){
     this.init(); if(!this.ctx) return;
     this.stopBgm();
-    this.bpm = 96 + level*7;
-    const scale = [0,3,5,7,10];         // マイナーペンタトニック
-    const roots = [55,55,58,62];        // A1 A1 C2 D2 相当の進行
-    const iv = 60000/this.bpm/2;
-    this.step = 0;
-    this.timer = setInterval(()=>{
-      if(!cfg.bgm || !cfg.sound) return;
-      const s = this.step++, bar = Math.floor(s/8)%roots.length, root = roots[bar];
-      if(s%4===0) this.blip(root, 0.22, "sine", 0.5, this.bgmGain);
-      const deg = scale[(s*3)%scale.length];
-      const oct = (s%8<4)?2:3;
-      this.blip(root*Math.pow(2,(deg+12*oct)/12), 0.14, "triangle", 0.22, this.bgmGain);
-      if(s%8===6) this.blip(root*4, 0.09, "square", 0.10, this.bgmGain);
-    }, iv);
+    if(!cfg.bgm) return;
+    this.initBgm();
+    this.nextT = this.ctx.currentTime + 0.08;
+    this.timer = setInterval(()=>this.schedule(), 25);
+  },
+  schedule(){
+    if(!this.ctx || !this.bgmReady) return;
+    const spb = 60/this.tempo;
+    while(this.nextT < this.ctx.currentTime + 0.12){
+      if(cfg.bgm && cfg.sound) this.scheduleStep(this.step, this.nextT);
+      this.nextT += 0.25*spb;   // 16分音符きざみ
+      this.step++;
+    }
   },
   stopBgm(){ if(this.timer){ clearInterval(this.timer); this.timer=null; } }
 };
@@ -547,6 +730,7 @@ const G = {
   trail:[], blocks:[], hearts:[], particles:[],
   input:{x:0.5,intensity:0},
   motion:null, stream:null, camReady:false, keyX:null,
+  sid:0, cdTimer:null,
   flash:0, lastT:0, launchAt:0
 };
 
@@ -589,20 +773,26 @@ function resetBall(){
   G.trail.length = 0;
 }
 function launch(){
-  const sp = 5.2 * LEVELS[G.level-1].speed * (Math.min(G.W,G.H)/720 + 0.55);
+  const sp = 5.2 * LEVELS[G.level-1].speed * SPEEDS[cfg.speed].m * (Math.min(G.W,G.H)/720 + 0.55);
   const ang = (-Math.PI/2) + (Math.random()-0.5)*0.7;
   G.ball.vx = Math.cos(ang)*sp; G.ball.vy = Math.sin(ang)*sp; G.ball.live = true;
 }
 
-function startLevel(level, keepScore){
+function startLevel(level, carry){
   G.level = clamp(level,1,10); cfg.level = G.level; saveCfg();
   resize();
-  if(!keepScore){ G.score = 0; G.lives = 5; G.sec = 0; G.startAt = now(); }
+  if(carry){
+    G.startAt = now() - G.sec*1000;          // ポイント・運動時間を引き継ぐ
+    if(carry === "retry") G.lives = 5;       // ゲームオーバーからの再開は残機だけ回復
+  } else {
+    G.score = 0; G.lives = 5; G.sec = 0; G.startAt = now();
+    G.sid = Date.now(); Sound.resetBgm();
+  }
   G.paddle.x = (G.W - G.paddle.w)/2;
   buildStage(); resetBall();
   G.state = "playing";
   hidePanel();
-  Sound.resume(); Sound.startBgm(G.level);
+  Sound.resume(); Sound.startBgm();
   syncHud();
 }
 
@@ -808,10 +998,10 @@ function recordsTable(){
 }
 
 function menu(){
-  G.state="menu"; Sound.stopBgm(); resize();
+  G.state="menu"; clearInterval(G.cdTimer); G.cdTimer=null; Sound.stopBgm(); Sound.resetBgm(); resize();
   showPanel(`
     <p class="eyebrow">EXERCISE THERAPY</p>
-    <h1>ニーアップ・<em>ブレイカー</em></h1>
+    <h1>ブロック崩し<em>de</em>足トレ</h1>
     <p class="lede">カメラの前に立ち、ひざを高く上げながら左右に体重を移します。動いた位置にバーが追従します。座ったままでも、足踏みで操作できます。</p>
 
     <div class="card">
@@ -835,6 +1025,13 @@ function menu(){
       <h2>設定</h2>
       <div class="row"><span>効果音</span><button class="sw" id="swSfx" data-on="${cfg.sound?1:0}"></button></div>
       <div class="row"><span>BGM</span><button class="sw" id="swBgm" data-on="${cfg.bgm?1:0}"></button></div>
+
+      <div class="row" style="display:block">
+        <span>ボールの速さ</span>
+        <div class="segs" id="segs">
+          ${SPEED_ORDER.map(k=>`<button class="seg" data-s="${k}" data-sel="${cfg.speed===k?1:0}">${SPEEDS[k].n}<small>×${speedRel(k).toFixed(2)}</small></button>`).join("")}
+        </div>
+      </div>
       <div class="row"><span>画面を暗くする</span><input type="range" id="dim" min="0" max="0.85" step="0.05" value="${cfg.dim}"></div>
       <div class="row"><span>カメラ</span><button class="ghost" style="width:auto;padding:9px 16px;margin:0" id="face">${cfg.facing==="user"?"インカメラ":"アウトカメラ"}</button></div>
       <div class="row" id="rowInstall" style="display:none"><span>ホーム画面に追加</span>
@@ -843,7 +1040,7 @@ function menu(){
     <p class="empty" style="text-align:center">描画：${GPU_RENDER?"WebGL2（GPU）":"Canvas 2D"} ／ 動作検出：GPUシェーダ差分</p>
   `);
 
-  const setName = ()=> $("#lvname").innerHTML = `<b>Lv${G.level}・${LEVELS[G.level-1].name}</b>　ボール速度 ×${LEVELS[G.level-1].speed.toFixed(2)}／バー幅 ${(LEVELS[G.level-1].paddle*100)|0}%`;
+  const setName = ()=> $("#lvname").innerHTML = `<b>Lv${G.level}・${LEVELS[G.level-1].name}</b>　ボール速度 ×${(LEVELS[G.level-1].speed*speedRel(cfg.speed)).toFixed(2)}（${SPEEDS[cfg.speed].n}）／バー幅 ${(LEVELS[G.level-1].paddle*100)|0}%`;
   setName();
   $("#levels").addEventListener("click", e=>{
     const t = e.target.closest(".lv"); if(!t) return;
@@ -860,7 +1057,14 @@ function menu(){
   $("#goNoCam").onclick = ()=>{ Sound.resume(); G.keyX = 0.5; startLevel(G.level,false); };
   $("#clr").onclick = ()=>{ Records.clear(); menu(); toast("記録を消しました"); };
   $("#swSfx").onclick = e=>{ cfg.sound=!cfg.sound; e.currentTarget.dataset.on=cfg.sound?1:0; saveCfg(); Sound.setEnabled(cfg.sound); };
-  $("#swBgm").onclick = e=>{ cfg.bgm=!cfg.bgm; e.currentTarget.dataset.on=cfg.bgm?1:0; saveCfg(); };
+  $("#swBgm").onclick = e=>{ cfg.bgm=!cfg.bgm; e.currentTarget.dataset.on=cfg.bgm?1:0; saveCfg(); if(!cfg.bgm) Sound.stopBgm(); };
+  $("#segs").addEventListener("click", e=>{
+    const t = e.target.closest(".seg"); if(!t) return;
+    setSpeed(t.dataset.s, false);
+    [...document.querySelectorAll(".seg")].forEach(b=> b.dataset.sel = (b.dataset.s===cfg.speed)?1:0);
+    setName();
+    Sound.resume(); Sound.blip(700,0.06,"triangle",0.2);
+  });
   $("#dim").oninput = e=>{ cfg.dim=+e.target.value; saveCfg(); };
   $("#face").onclick = async e=>{
     cfg.facing = cfg.facing==="user"?"environment":"user"; saveCfg();
@@ -872,17 +1076,24 @@ function menu(){
   }
 }
 
-function endGame(cleared){
+function endGame(cleared, noAuto){
   G.state = cleared ? "clear" : "over";
+  clearInterval(G.cdTimer); G.cdTimer = null;
   Sound.stopBgm(); cleared ? Sound.clear() : Sound.over();
-  const sec = Math.round(G.sec);
   if(cleared) G.score += 500 + G.level*100;
-  const rec = {t:Date.now(), sec, score:G.score, level:G.level};
-  const rank = Records.add(rec);          // 上位5件に自動登録
-  const next = Math.min(10, G.level+1);
+  const sec = Math.round(G.sec);
+  const rec = {t:Date.now(), sec, score:G.score, level:G.level, sid:G.sid};
+  const rank = Records.add(rec);              // 上位5件に自動登録（同一セッションは1件）
+
+  // クリア → 次のレベルへ ／ ゲームオーバー → 同じレベルをやり直し。どちらも5秒で自動
+  const toNext = cleared && G.level < 10;
+  const target = toNext ? G.level+1 : G.level;
+  const mode   = toNext ? "next" : "retry";
+  const auto   = (toNext || !cleared) && !noAuto;   // 自分でやめたとき・Lv10クリア時は自動継続しない
+
   showPanel(`
-    <p class="eyebrow">${cleared?"STAGE CLEAR":"SESSION END"}</p>
-    <h1>${cleared?`Lv${G.level} <em>クリア</em>`:"おつかれさまでした"}</h1>
+    <p class="eyebrow">${cleared?"STAGE CLEAR":"MISS"}</p>
+    <h1>${cleared?`Lv${G.level} <em>クリア</em>`:"もういちど <em>いこう</em>"}</h1>
     <div class="card big">
       <div class="n">${fmtTime(sec)}</div>
       <div class="u">うんどう時間</div>
@@ -890,16 +1101,63 @@ function endGame(cleared){
     </div>
     <div class="grid2">
       <div class="card big" style="margin:0"><div class="n" style="font-size:38px;color:var(--amber)">${G.score}</div><div class="u">ポイント</div></div>
-      <div class="card big" style="margin:0"><div class="n" style="font-size:38px;color:var(--teal)">Lv${G.level}</div><div class="u">${LEVELS[G.level-1].name}</div></div>
+      <div class="card big" style="margin:0"><div class="n" style="font-size:38px;color:var(--teal)">Lv${target}</div><div class="u">${LEVELS[target-1].name}</div></div>
     </div>
-    ${cleared && G.level<10 ? `<button class="cta" id="next">Lv${next} へ進む</button>`:""}
-    <button class="${cleared&&G.level<10?"ghost":"cta"}" id="again">同じレベルでもう一度</button>
+    ${auto ? `
+      <div class="card" id="cdCard">
+        <h2>${toNext?"つぎのステージへ":"おなじレベルで再開"}</h2>
+        <div style="display:flex;align-items:center;gap:16px">
+          <div class="ring"><svg viewBox="0 0 44 44"><circle class="bg" cx="22" cy="22" r="19"/><circle class="fg" id="cdArc" cx="22" cy="22" r="19"/></svg><span id="cdNum">5</span></div>
+          <div style="font:600 12px/1.6 var(--ui);color:var(--slate)">
+            <b style="color:var(--text)">Lv${target}・${LEVELS[target-1].name}</b> に自動で移ります。<br>
+            ポイント（${G.score}）とうんどう時間（${fmtTime(sec)}）はそのまま引き継ぎます。${
+              toNext ? `のこりも ${G.lives} のままです。` : `のこりは 5 にもどります。`}
+          </div>
+        </div>
+      </div>
+      <button class="cta" id="go2">いますぐ${toNext?`Lv${target}へ`:"再開する"}</button>` : ""}
+    <button class="${auto?"ghost":"cta"}" id="again">はじめから（ポイントと時間をリセット）</button>
     <button class="ghost" id="home">メニューにもどる</button>
     <div class="card" style="margin-top:14px"><h2>記録 上位5件</h2>${recordsTable()}</div>
   `);
-  const nb=$("#next"); if(nb) nb.onclick = ()=> startLevel(next,false);
-  $("#again").onclick = ()=> startLevel(G.level,false);
-  $("#home").onclick = ()=> menu();
+
+  const stopCd = ()=>{ clearInterval(G.cdTimer); G.cdTimer = null; };
+  $("#again").onclick = ()=>{ stopCd(); startLevel(G.level,false); };
+  $("#home").onclick  = ()=>{ stopCd(); menu(); };
+
+  if(auto){
+    $("#go2").onclick = ()=>{ stopCd(); startLevel(target,mode); };
+    let left = 5;
+    const arc = $("#cdArc"), num = $("#cdNum"), C = 2*Math.PI*19;
+    arc.style.strokeDasharray = C;
+    const tick = ()=>{
+      num.textContent = left;
+      arc.style.strokeDashoffset = C*(1 - left/5);
+      if(left<=0){ stopCd(); startLevel(target,mode); return; }
+      left--;
+    };
+    tick();
+    G.cdTimer = setInterval(tick, 1000);
+  }
+}
+
+/* --- ボールの速さ --- */
+function syncSpeedBtn(){
+  const sp = SPEEDS[cfg.speed];
+  const el = $("#spLbl"); if(el){ el.textContent = sp.n; el.style.color = sp.c; }
+  $("#btnSpeed").style.borderColor = sp.c;
+  const v = $("#spBadgeVal"), m = $("#spBadgeMul");
+  if(v){ v.textContent = sp.n; v.style.color = sp.c; }
+  if(m){ m.textContent = "×" + speedRel(cfg.speed).toFixed(2); }
+  $("#spBadge").style.borderColor = sp.c;
+}
+function setSpeed(key, announce){
+  if(!SPEEDS[key]) return;
+  const ratio = SPEEDS[key].m / SPEEDS[cfg.speed].m;
+  cfg.speed = key; saveCfg();
+  if(G.ball.live){ G.ball.vx *= ratio; G.ball.vy *= ratio; }   // プレイ中でも即反映
+  syncSpeedBtn();
+  if(announce) toast("ボールの速さ：" + SPEEDS[key].n);
 }
 
 /* --- ツールバー --- */
@@ -907,20 +1165,27 @@ $("#btnSound").onclick = ()=>{ cfg.sound=!cfg.sound; saveCfg(); Sound.setEnabled
   $("#btnSound").textContent = cfg.sound?"🔊":"🔇"; $("#btnSound").classList.toggle("on",cfg.sound); };
 $("#btnSound").textContent = cfg.sound?"🔊":"🔇";
 $("#btnSound").classList.toggle("on",cfg.sound);
+$("#btnSpeed").onclick = ()=>{
+  const i = SPEED_ORDER.indexOf(cfg.speed);
+  setSpeed(SPEED_ORDER[(i+1) % SPEED_ORDER.length], true);
+  Sound.resume(); Sound.blip(760,0.06,"triangle",0.22);
+};
+syncSpeedBtn();
 $("#btnCam").onclick = async ()=>{
   cfg.facing = cfg.facing==="user"?"environment":"user"; saveCfg();
   if(G.stream){ try{ await startCamera(cfg.facing); }catch(e){ toast("カメラを切り替えられません"); } }
 };
-$("#btnPause").onclick = ()=>{
+function doPause(){
   if(G.state==="playing"){ G.state="paused"; Sound.stopBgm();
     showPanel(`<p class="eyebrow">PAUSED</p><h1>中断中</h1>
       <p class="lede">休憩をとってから再開してください。</p>
       <button class="cta" id="res">再開する</button>
       <button class="ghost" id="quit">やめて記録する</button>`);
-    $("#res").onclick = ()=>{ hidePanel(); G.state="playing"; G.startAt = now()-G.sec*1000; Sound.resume(); Sound.startBgm(G.level); };
-    $("#quit").onclick = ()=> endGame(false);
+    $("#res").onclick = ()=>{ hidePanel(); G.state="playing"; G.startAt = now()-G.sec*1000; Sound.resume(); Sound.startBgm(); };
+    $("#quit").onclick = ()=> endGame(false, true);
   }
-};
+}
+$("#btnPause").onclick = doPause;
 
 /* --- キーボード／タッチ（カメラ無しでも操作可能） --- */
 addEventListener("keydown", e=>{
@@ -941,7 +1206,7 @@ if("serviceWorker" in navigator){
   addEventListener("load", ()=> navigator.serviceWorker.register("sw.js").catch(()=>{}));
 }
 document.addEventListener("visibilitychange", ()=>{
-  if(document.hidden && G.state==="playing"){ G.state="paused"; Sound.stopBgm(); }
+  if(document.hidden) doPause();
 });
 
 /* --- 起動 --- */
