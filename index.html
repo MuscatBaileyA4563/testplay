@@ -32,12 +32,11 @@ button{font-family:inherit;color:inherit;cursor:pointer}
 #stage{position:fixed;inset:0;overflow:hidden}
 
 /* --- カメラ層：CSSフィルタはGPU合成。動作差分はvideoの生フレームを読むため認識範囲は不変 --- */
+/* 全画面 blur はGPUの合成コストが高いため使わず、減光とコントラストで視認性を確保する */
 #cam{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;
-  filter:blur(3px) saturate(.45) brightness(.55) contrast(.9);
-  transform:scale(1.06);will-change:filter}
+  filter:saturate(.42) brightness(.5) contrast(.92);
+  transform:scale(1.06)}
 #cam.mirror{transform:scale(1.06) scaleX(-1)}
-/* 省電力：全画面 blur はGPUの合成コストが高いので外し、減光だけで視認性を確保する */
-#cam.eco{filter:saturate(.42) brightness(.5) contrast(.92)}
 #gl{position:absolute;inset:0;width:100%;height:100%;display:block;z-index:2}
 
 /* --- HUD --- */
@@ -220,9 +219,7 @@ const S = {
   load(){ try{ return JSON.parse(localStorage.getItem("kb.cfg")||"{}"); }catch(e){ return {}; } },
   save(o){ try{ localStorage.setItem("kb.cfg", JSON.stringify(o)); }catch(e){} }
 };
-const cfg = Object.assign({sound:true, bgm:true, speed:"mid", dim:0.55, facing:"environment", level:1,
-  eco:true    // 省電力（発熱を抑える）：解像度・カメラ画質・エフェクトを落とす
-}, S.load());
+const cfg = Object.assign({sound:true, bgm:true, speed:"mid", dim:0.55, facing:"environment", level:1}, S.load());
 const saveCfg = () => S.save(cfg);
 
 /* ---------- 記録（上位5件） ---------- */
@@ -761,7 +758,7 @@ const G = {
 
 function resize(){
   G.W = window.innerWidth; G.H = window.innerHeight;
-  G.dpr = Math.min(window.devicePixelRatio||1, cfg.eco ? 1.4 : 2);   // 省電力時は描画画素数を約半分に
+  G.dpr = Math.min(window.devicePixelRatio||1, 1.4);   // 描画画素数を抑えて発熱を下げる
   G.paddle.y = G.H*0.86;
   G.paddle.w = G.W * LEVELS[G.level-1].paddle;
   G.ball.r = Math.max(11, Math.min(G.W,G.H)*0.022);
@@ -910,7 +907,7 @@ function update(dt){
     if(q.life<=0) G.particles.splice(i,1);
   }
   // 軌跡
-  G.trail.push({x:b.x,y:b.y}); if(G.trail.length > (cfg.eco?8:14)) G.trail.shift();
+  G.trail.push({x:b.x,y:b.y}); if(G.trail.length > 8) G.trail.shift();
   G.flash = Math.max(0, G.flash - 0.06*dt);
 
   // クリア判定（破壊不能ブロックは対象外）
@@ -956,18 +953,17 @@ function draw(){
 
 /* --- ループ --- */
 let raf = 0;
+const FRAME_MS = 1000/30;      // 描画・検出とも30fpsに制限（カメラも30fpsなので取りこぼしはない）
 function frame(t){
-  // パネルが画面を覆っているあいだは検出も描画も不要（10fpsで待機するだけ）
-  if(!panel.classList.contains("hidden")){
-    if(t - (G.panelT||0) > 100){ G.panelT = t; }
-    G.lastT = t;
-    raf = requestAnimationFrame(frame); return;
-  }
-  const dt = clamp((t-(G.lastT||t))/16.667, 0, 3); G.lastT = t;
+  raf = requestAnimationFrame(frame);
+  // パネルが画面を覆っているあいだは検出も描画も不要
+  if(!panel.classList.contains("hidden")){ G.lastT = t; return; }
+  if(t - (G.lastDraw||0) < FRAME_MS - 1.5) return;
+  G.lastDraw = t;
+  const dt = clamp((t-(G.lastT||t))/16.667, 0, 3.5); G.lastT = t;
   if(G.motion && G.camReady) analyze(G.motion.read(), cfg.facing==="user", G.input);
   update(dt);
   draw();
-  raf = requestAnimationFrame(frame);
 }
 
 /* --- HUD --- */
@@ -990,13 +986,12 @@ async function startCamera(facing){
   stopCamera();
   const get = (exact)=> navigator.mediaDevices.getUserMedia({
     video:{ facingMode: exact?{exact:facing}:facing,
-            width:{ideal: cfg.eco?320:640}, height:{ideal: cfg.eco?240:480},
+            width:{ideal:320}, height:{ideal:240},   // 検出は64×48に縮小するため精度に影響しない
             frameRate:{ideal:30, max:30} }, audio:false });
   let stream;
   try{ stream = await get(true); }catch(e){ stream = await get(false); }
   G.stream = stream; cam.srcObject = stream;
   cam.classList.toggle("mirror", facing==="user");
-  cam.classList.toggle("eco", !!cfg.eco);
   await cam.play();
   const m = new MotionGPU(cam);
   G.motion = m.ok ? m : new Motion2D(cam);
@@ -1073,8 +1068,6 @@ function menu(){
           ${SPEED_ORDER.map(k=>`<button class="seg" data-s="${k}" data-sel="${cfg.speed===k?1:0}">${SPEEDS[k].n}<small>×${speedRel(k).toFixed(2)}</small></button>`).join("")}
         </div>
       </div>
-      <div class="row"><span>省電力（発熱を抑える）<small style="display:block;font:500 10px/1.4 var(--ui);color:var(--slate)">描画画素数・カメラ画質・エフェクトを下げます。検出の精度は変わりません</small></span>
-        <button class="sw" id="swEco" data-on="${cfg.eco?1:0}"></button></div>
       <div class="row"><span>画面を暗くする</span><input type="range" id="dim" min="0" max="0.85" step="0.05" value="${cfg.dim}"></div>
       <div class="row"><span>カメラ</span><button class="ghost" style="width:auto;padding:9px 16px;margin:0" id="face">${cfg.facing==="user"?"インカメラ":"アウトカメラ"}</button></div>
       <div class="row" id="rowInstall" style="display:none"><span>ホーム画面に追加</span>
@@ -1108,11 +1101,6 @@ function menu(){
     setName();
     Sound.resume(); Sound.blip(700,0.06,"triangle",0.2);
   });
-  $("#swEco").onclick = e=>{
-    cfg.eco = !cfg.eco; e.currentTarget.dataset.on = cfg.eco?1:0; saveCfg();
-    cam.classList.toggle("eco", !!cfg.eco); resize();
-    toast(cfg.eco ? "省電力：オン（カメラ画質は次回開始から）" : "省電力：オフ");
-  };
   $("#dim").oninput = e=>{ cfg.dim=+e.target.value; saveCfg(); };
   $("#face").onclick = async e=>{
     cfg.facing = cfg.facing==="user"?"environment":"user"; saveCfg();
