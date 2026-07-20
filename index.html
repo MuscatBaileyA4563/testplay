@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
-<title>ブロック崩しde足トレ | 運動療法アプリ</title>
+<title>ブロック崩しde足トレ | 足の運動支援ゲーム</title>
 <meta name="theme-color" content="#080B14" />
 <meta name="mobile-web-app-capable" content="yes" />
 <meta name="apple-mobile-web-app-capable" content="yes" />
@@ -104,6 +104,10 @@ td{padding:9px 0;border-top:1px solid rgba(255,255,255,.07);text-align:right;col
 tr td:nth-child(1){color:var(--slate);font-size:11px}
 .rank1 td{color:var(--amber)}
 .empty{color:var(--slate);font:500 12px/1.6 var(--ui);margin:0}
+.card.note{background:rgba(255,255,255,.035);border-color:rgba(255,255,255,.09)}
+.notes{margin:0;padding-left:1.1em;color:var(--slate);font:500 12px/1.7 var(--ui)}
+.notes li{margin-top:6px}
+.notes li:first-child{margin-top:0}
 .cta{width:100%;border:none;border-radius:18px;padding:19px;background:var(--amber);color:#1A1200;
   font:800 17px/1 var(--ui);letter-spacing:.08em;margin-top:4px}
 .cta:active{transform:scale(.985)}
@@ -172,7 +176,7 @@ input[type=range]::-moz-range-thumb{width:20px;height:20px;border:none;border-ra
 <script>
 "use strict";
 /* ===========================================================
-   ブロック崩しde足トレ / 運動療法用ブロック崩し
+   ブロック崩しde足トレ / 足上げ運動ゲーム
    - 描画：WebGL2（2Dキャンバスへ自動フォールバック）
    - 動作検出：WebGL2フラグメントシェーダによるフレーム間差分
    - 記録：localStorage（上位5件を自動登録）
@@ -1036,9 +1040,19 @@ function recordsTable(){
 function menu(){
   G.state="menu"; clearInterval(G.cdTimer); G.cdTimer=null; Sound.stopBgm(); Sound.resetBgm(); resize();
   showPanel(`
-    <p class="eyebrow">EXERCISE THERAPY</p>
+    <p class="eyebrow">LEG EXERCISE GAME</p>
     <h1>ブロック崩し<em>de</em>足トレ</h1>
-    <p class="lede">仰臥位のまま、足もと側にスマートフォンを固定して使用します。<b style="color:var(--text)">左足を上げると左へ、右足を上げると右へ</b>バーが移動します。膝を高く上げるほど確実に検出されます。座位で足踏みをする形でも操作できます。</p>
+    <p class="lede">仰向けのまま、足もと側にスマートフォンを固定して使用します。<b style="color:var(--text)">左足を上げると左へ、右足を上げると右へ</b>バーが移動します。足を高く上げるほど確実に検出されます。座ったまま足踏みをする形でも操作できます。</p>
+
+    <div class="card note">
+      <h2>ご使用の前に</h2>
+      <ul class="notes">
+        <li>スマートフォンは倒れない位置にしっかり固定し、周囲に障害物がないことを確認してください。</li>
+        <li>痛み、めまい、息苦しさ、動悸、強い疲労を感じた場合は、直ちに運動を中止してください。</li>
+        <li>治療中の方、運動を制限されている方、体調に不安のある方は、医師または医療従事者の指示に従ってください。</li>
+        <li>カメラ映像は足の動きを検出するため端末内でリアルタイムに処理します。映像・音声の保存や外部送信は行いません。</li>
+      </ul>
+    </div>
 
     <div class="card">
       <h2>レベル（全10段階）</h2>
@@ -1073,7 +1087,15 @@ function menu(){
       <div class="row" id="rowInstall" style="display:none"><span>ホーム画面に追加</span>
         <button class="ghost" style="width:auto;padding:9px 16px;margin:0" id="install">インストール</button></div>
     </div>
-    <p class="empty" style="text-align:center">描画：${GPU_RENDER?"WebGL2（GPU）":"Canvas 2D"} ／ 動作検出：GPUシェーダ差分</p>
+    <div class="card note">
+      <h2>このアプリについて</h2>
+      <ul class="notes">
+        <li>本アプリは、身体を動かす機会を提供することを目的とした運動支援ゲームです。疾病の診断、治療または予防を目的とする医療機器ではありません。</li>
+        <li>本アプリが表示するポイント、運動時間、レベルその他の情報は、筋力、身体機能、治療効果その他の医学的評価を示すものではありません。</li>
+      </ul>
+    </div>
+
+    <p class="empty" style="text-align:center">描画：${GPU_RENDER?"WebGL2（GPU）":"Canvas 2D"} ／ 動作検出：フレーム間差分</p>
   `);
 
   const setName = ()=> $("#lvname").innerHTML = `<b>Lv${G.level}・${LEVELS[G.level-1].name}</b>　ボール速度 ×${(LEVELS[G.level-1].speed*speedRel(cfg.speed)).toFixed(2)}（${SPEEDS[cfg.speed].n}）／バー幅 ${(LEVELS[G.level-1].paddle*100)|0}%`;
